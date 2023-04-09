@@ -3,7 +3,7 @@ package report
 import (
 	"time"
 
-	"github.com/librespeed/speedtest-cli/defs"
+	"github.com/czechbol/librespeed-cli/defs"
 )
 
 // Report represents the output data fields in a nestable file data such as JSON.

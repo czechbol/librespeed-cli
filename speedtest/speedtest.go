@@ -18,8 +18,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
-	"github.com/librespeed/speedtest-cli/defs"
-	"github.com/librespeed/speedtest-cli/report"
+	"github.com/czechbol/librespeed-cli/defs"
+	"github.com/czechbol/librespeed-cli/report"
 )
 
 const (
@@ -65,7 +65,7 @@ func RunCli(c *cli.Context) error {
 	if c.Bool(defs.OptionVersion) {
 		log.SetOutput(os.Stdout)
 		log.Warnf("%s %s (built on %s)", defs.ProgName, defs.ProgVersion, defs.BuildDate)
-		log.Warn("https://github.com/librespeed/speedtest-cli")
+		log.Warn("https://github.com/czechbol/librespeed-cli")
 		log.Warn("Licensed under GNU Lesser General Public License v3.0")
 		log.Warn("LibreSpeed\tCopyright (C) 2016-2020 Federico Dossena")
 		log.Warn("librespeed-cli\tCopyright (C) 2020 Maddie Zhan")
