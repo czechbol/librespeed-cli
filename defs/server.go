@@ -188,14 +188,14 @@ func (s *Server) PingAndJitter(count int) (float64, float64, error) {
 }
 
 // Download performs the actual download test
-func (s *Server) Download(silent bool, useBytes, useMebi bool, requests int, chunks int, duration time.Duration) (float64, int, error) {
+func (s *Server) Download(silent bool, useBytes, useBinaryBase bool, requests int, chunks int, duration time.Duration) (float64, int, error) {
 	t := time.Now()
 	defer func() {
 		s.TLog.Logf("Download took %s", time.Now().Sub(t).String())
 	}()
 
 	counter := NewCounter()
-	counter.SetMebi(useMebi)
+	counter.SetBinaryBase(useBinaryBase)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -280,14 +280,14 @@ Loop:
 }
 
 // Upload performs the actual upload test
-func (s *Server) Upload(noPrealloc, silent, useBytes, useMebi bool, requests int, uploadSize int, duration time.Duration) (float64, int, error) {
+func (s *Server) Upload(noPrealloc, silent, useBytes, useBinaryBase bool, requests int, uploadSize int, duration time.Duration) (float64, int, error) {
 	t := time.Now()
 	defer func() {
 		s.TLog.Logf("Upload took %s", time.Now().Sub(t).String())
 	}()
 
 	counter := NewCounter()
-	counter.SetMebi(useMebi)
+	counter.SetBinaryBase(useBinaryBase)
 	counter.SetUploadSize(uploadSize)
 
 	if noPrealloc {

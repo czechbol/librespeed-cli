@@ -27,17 +27,17 @@ const (
 )
 
 // doSpeedTest is where the actual speed test happens
-func doSpeedTest(c *cli.Context, servers []defs.Server, telemetryServer defs.TelemetryServer, network string, silent bool) error {
-	if serverCount := len(servers); serverCount > 1 {
+func CliSpeedTest(testOpts *defs.TestOptions, c *cli.Context, silent bool) error {
+	if serverCount := len(testOpts.ServerList); serverCount > 1 {
 		log.Infof("Testing against %d servers", serverCount)
 	}
 
 	var reps []report.Report
 
 	// fetch current user's IP info
-	for _, currentServer := range servers {
+	for _, currentServer := range testOpts.ServerList {
 		// get telemetry level
-		currentServer.TLog.SetLevel(telemetryServer.GetLevel())
+		currentServer.TLog.SetLevel(testOpts.TelemetryServer.GetLevel())
 
 		u, err := currentServer.GetURL()
 		if err != nil {
@@ -51,118 +51,115 @@ func doSpeedTest(c *cli.Context, servers []defs.Server, telemetryServer defs.Tel
 			log.Infof("Sponsored by: %s", sponsorMsg)
 		}
 
-		if currentServer.IsUp() {
-			ispInfo, err := currentServer.GetIPInfo(c.String(defs.OptionDistance))
-			if err != nil {
-				log.Errorf("Failed to get IP info: %s", err)
-				return err
-			}
-			log.Infof("You're testing from: %s", ispInfo.ProcessedString)
-
-			// get ping and jitter value
-			var pb *spinner.Spinner
-			if !silent {
-				pb = spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-				pb.Prefix = "Pinging server...  "
-				pb.Start()
-			}
-
-			// skip ICMP if option given
-			currentServer.NoICMP = c.Bool(defs.OptionNoICMP)
-
-			p, jitter, err := currentServer.ICMPPingAndJitter(pingCount, c.String(defs.OptionSource), network)
-			if err != nil {
-				log.Errorf("Failed to get ping and jitter: %s", err)
-				return err
-			}
-
-			if pb != nil {
-				pb.FinalMSG = fmt.Sprintf("Ping: %.2f ms\tJitter: %.2f ms\n", p, jitter)
-				pb.Stop()
-			}
-
-			// get download value
-			var downloadValue float64
-			var bytesRead int
-			if c.Bool(defs.OptionNoDownload) {
-				log.Info("Download test is disabled")
-			} else {
-				download, br, err := currentServer.Download(silent, c.Bool(defs.OptionBytes), c.Bool(defs.OptionMebiBytes), c.Int(defs.OptionConcurrent), c.Int(defs.OptionChunks), time.Duration(c.Int(defs.OptionDuration))*time.Second)
-				if err != nil {
-					log.Errorf("Failed to get download speed: %s", err)
-					return err
-				}
-				downloadValue = download
-				bytesRead = br
-			}
-
-			// get upload value
-			var uploadValue float64
-			var bytesWritten int
-			if c.Bool(defs.OptionNoUpload) {
-				log.Info("Upload test is disabled")
-			} else {
-				upload, bw, err := currentServer.Upload(c.Bool(defs.OptionNoPreAllocate), silent, c.Bool(defs.OptionBytes), c.Bool(defs.OptionMebiBytes), c.Int(defs.OptionConcurrent), c.Int(defs.OptionUploadSize), time.Duration(c.Int(defs.OptionDuration))*time.Second)
-				if err != nil {
-					log.Errorf("Failed to get upload speed: %s", err)
-					return err
-				}
-				uploadValue = upload
-				bytesWritten = bw
-			}
-
-			// print result if --simple is given
-			if c.Bool(defs.OptionSimple) {
-				if c.Bool(defs.OptionBytes) {
-					useMebi := c.Bool(defs.OptionMebiBytes)
-					log.Warnf("Ping:\t%.2f ms\tJitter:\t%.2f ms\nDownload rate:\t%s\nUpload rate:\t%s", p, jitter, humanizeMbps(downloadValue, useMebi), humanizeMbps(uploadValue, useMebi))
-				} else {
-					log.Warnf("Ping:\t%.2f ms\tJitter:\t%.2f ms\nDownload rate:\t%.2f Mbps\nUpload rate:\t%.2f Mbps", p, jitter, downloadValue, uploadValue)
-				}
-			}
-
-			// print share link if --share is given
-			var shareLink string
-			if telemetryServer.GetLevel() > 0 {
-				var extra defs.TelemetryExtra
-				extra.ServerName = currentServer.Name
-				extra.Extra = c.String(defs.OptionTelemetryExtra)
-
-				if link, err := sendTelemetry(telemetryServer, ispInfo, downloadValue, uploadValue, p, jitter, currentServer.TLog.String(), extra); err != nil {
-					log.Errorf("Error when sending telemetry data: %s", err)
-				} else {
-					shareLink = link
-					// only print to stdout when --json and --csv are not used
-					if !c.Bool(defs.OptionJSON) && !c.Bool(defs.OptionCSV) {
-						log.Warnf("Share your result: %s", link)
-					}
-				}
-			}
-
-			var rep report.Report
-			rep.Timestamp = time.Now()
-
-			rep.Ping = math.Round(p*100) / 100
-			rep.Jitter = math.Round(jitter*100) / 100
-			rep.Download = math.Round(downloadValue*100) / 100
-			rep.Upload = math.Round(uploadValue*100) / 100
-			rep.BytesReceived = bytesRead
-			rep.BytesSent = bytesWritten
-			rep.Share = shareLink
-
-			rep.Server.Name = currentServer.Name
-			rep.Server.URL = u.String()
-
-			rep.Client = report.Client{IPInfoResponse: ispInfo.RawISPInfo}
-			rep.Client.Readme = ""
-
-			reps = append(reps, rep)
-		} else {
+		if !currentServer.IsUp() {
 			log.Infof("Selected server %s (%s) is not responding at the moment, try again later", currentServer.Name, u.Hostname())
 		}
 
+		ispInfo, err := currentServer.GetIPInfo(string(testOpts.DistanceUnit))
+		if err != nil {
+			log.Errorf("Failed to get IP info: %s", err)
+			return err
+		}
+		log.Infof("You're testing from: %s", ispInfo.ProcessedString)
+
+		// get ping and jitter value
+		var pb *spinner.Spinner
+		if !silent {
+			pb = spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+			pb.Prefix = "Pinging server...  "
+			pb.Start()
+		}
+
+		p, jitter, err := currentServer.ICMPPingAndJitter(pingCount, testOpts.SourceIP, testOpts.Network)
+		if err != nil {
+			log.Errorf("Failed to get ping and jitter: %s", err)
+			return err
+		}
+
+		if pb != nil {
+			pb.FinalMSG = fmt.Sprintf("Ping: %.2f ms\tJitter: %.2f ms\n", p, jitter)
+			pb.Stop()
+		}
+
+		// get download value
+		var downloadValue float64
+		var bytesRead int
+		if testOpts.NoDownload {
+			log.Info("Download test is disabled")
+		} else {
+			download, br, err := currentServer.Download(silent, testOpts.Bytes, testOpts.BinaryBase, testOpts.Concurrent, testOpts.Chunks, time.Duration(testOpts.Duration)*time.Second)
+			if err != nil {
+				log.Errorf("Failed to get download speed: %s", err)
+				return err
+			}
+			downloadValue = download
+			bytesRead = br
+		}
+
+		// get upload value
+		var uploadValue float64
+		var bytesWritten int
+		if testOpts.NoUpload {
+			log.Info("Upload test is disabled")
+		} else {
+			upload, bw, err := currentServer.Upload(testOpts.NoPreAllocate, silent, testOpts.Bytes, testOpts.BinaryBase, testOpts.Concurrent, testOpts.Chunks, time.Duration(testOpts.Duration)*time.Second)
+			if err != nil {
+				log.Errorf("Failed to get upload speed: %s", err)
+				return err
+			}
+			uploadValue = upload
+			bytesWritten = bw
+		}
+
+		// print result if --simple is given
+		if c.Bool(defs.OptionSimple) {
+			if testOpts.Bytes {
+				binaryBase := testOpts.BinaryBase
+				log.Warnf("Ping:\t%.2f ms\tJitter:\t%.2f ms\nDownload rate:\t%s\nUpload rate:\t%s", p, jitter, humanizeMbps(downloadValue, binaryBase), humanizeMbps(uploadValue, binaryBase))
+			} else {
+				log.Warnf("Ping:\t%.2f ms\tJitter:\t%.2f ms\nDownload rate:\t%.2f Mbps\nUpload rate:\t%.2f Mbps", p, jitter, downloadValue, uploadValue)
+			}
+		}
+
+		// print share link if --share is given
+		var shareLink string
+		if testOpts.TelemetryServer.GetLevel() > 0 {
+			var extra defs.TelemetryExtra
+			extra.ServerName = currentServer.Name
+			extra.Extra = testOpts.TelemetryExtra
+
+			if link, err := sendTelemetry(testOpts.TelemetryServer, ispInfo, downloadValue, uploadValue, p, jitter, currentServer.TLog.String(), extra); err != nil {
+				log.Errorf("Error when sending telemetry data: %s", err)
+			} else {
+				shareLink = link
+				// only print to stdout when --json and --csv are not used
+				if !c.Bool(defs.OptionJSON) && !c.Bool(defs.OptionCSV) {
+					log.Warnf("Share your result: %s", link)
+				}
+			}
+		}
+
+		var rep report.Report
+		rep.Timestamp = time.Now()
+
+		rep.Ping = math.Round(p*100) / 100
+		rep.Jitter = math.Round(jitter*100) / 100
+		rep.Download = math.Round(downloadValue*100) / 100
+		rep.Upload = math.Round(uploadValue*100) / 100
+		rep.BytesReceived = bytesRead
+		rep.BytesSent = bytesWritten
+		rep.Share = shareLink
+
+		rep.Server.Name = currentServer.Name
+		rep.Server.URL = u.String()
+
+		rep.Client = report.Client{IPInfoResponse: ispInfo.RawISPInfo}
+		rep.Client.Readme = ""
+
+		reps = append(reps, rep)
+
 		//add a new line after each test if testing multiple servers
-		if len(servers) > 1 && !silent {
+		if len(testOpts.ServerList) > 1 && !silent {
 			log.Warn()
 		}
 	}
@@ -187,6 +184,113 @@ func doSpeedTest(c *cli.Context, servers []defs.Server, telemetryServer defs.Tel
 	}
 
 	return nil
+}
+
+func SpeedTest(testOpts *defs.TestOptions) (*[]report.Report, error) {
+	if serverCount := len(testOpts.ServerList); serverCount > 1 {
+		log.Debugf("Testing against %d servers", serverCount)
+	}
+
+	var reps []report.Report
+
+	// fetch current user's IP info
+	for _, currentServer := range testOpts.ServerList {
+		// get telemetry level
+		currentServer.TLog.SetLevel(testOpts.TelemetryServer.GetLevel())
+
+		u, err := currentServer.GetURL()
+		if err != nil {
+			log.Errorf("Failed to get server URL: %s", err)
+			return nil, err
+		}
+
+		log.Debugf("Selected server: %s [%s]", currentServer.Name, u.Hostname())
+
+		if sponsorMsg := currentServer.Sponsor(); sponsorMsg != "" {
+			log.Debugf("Sponsored by: %s", sponsorMsg)
+		}
+
+		if !currentServer.IsUp() {
+			log.Debugf("Selected server %s (%s) is not responding at the moment, try again later", currentServer.Name, u.Hostname())
+		}
+		ispInfo, err := currentServer.GetIPInfo(string(testOpts.DistanceUnit))
+		if err != nil {
+			log.Errorf("Failed to get IP info: %s", err)
+			return nil, err
+		}
+		log.Debugf("You're testing from: %s", ispInfo.ProcessedString)
+
+		p, jitter, err := currentServer.ICMPPingAndJitter(pingCount, testOpts.SourceIP, testOpts.Network)
+		if err != nil {
+			log.Errorf("Failed to get ping and jitter: %s", err)
+			return nil, err
+		}
+
+		// get download value
+		var downloadValue float64
+		var bytesRead int
+		if testOpts.NoDownload {
+			log.Debugf("Download test is disabled")
+		} else {
+			download, br, err := currentServer.Download(true, testOpts.Bytes, testOpts.BinaryBase, testOpts.Concurrent, testOpts.Chunks, time.Duration(testOpts.Duration)*time.Second)
+			if err != nil {
+				log.Errorf("Failed to get download speed: %s", err)
+				return nil, err
+			}
+			downloadValue = download
+			bytesRead = br
+		}
+
+		// get upload value
+		var uploadValue float64
+		var bytesWritten int
+		if testOpts.NoUpload {
+			log.Debugf("Upload test is disabled")
+		} else {
+			upload, bw, err := currentServer.Upload(testOpts.NoPreAllocate, true, testOpts.Bytes, testOpts.BinaryBase, testOpts.Concurrent, testOpts.Chunks, time.Duration(testOpts.Duration)*time.Second)
+			if err != nil {
+				log.Errorf("Failed to get upload speed: %s", err)
+				return nil, err
+			}
+			uploadValue = upload
+			bytesWritten = bw
+		}
+
+		// print share link if --share is given
+		var shareLink string
+		if testOpts.TelemetryServer.GetLevel() > 0 {
+			var extra defs.TelemetryExtra
+			extra.ServerName = currentServer.Name
+			extra.Extra = testOpts.TelemetryExtra
+
+			if link, err := sendTelemetry(testOpts.TelemetryServer, ispInfo, downloadValue, uploadValue, p, jitter, currentServer.TLog.String(), extra); err != nil {
+				log.Errorf("Error when sending telemetry data: %s", err)
+			} else {
+				shareLink = link
+			}
+		}
+
+		var rep report.Report
+		rep.Timestamp = time.Now()
+
+		rep.Ping = math.Round(p*100) / 100
+		rep.Jitter = math.Round(jitter*100) / 100
+		rep.Download = math.Round(downloadValue*100) / 100
+		rep.Upload = math.Round(uploadValue*100) / 100
+		rep.BytesReceived = bytesRead
+		rep.BytesSent = bytesWritten
+		rep.Share = shareLink
+
+		rep.Server.Name = currentServer.Name
+		rep.Server.URL = u.String()
+
+		rep.Client = report.Client{IPInfoResponse: ispInfo.RawISPInfo}
+		rep.Client.Readme = ""
+
+		reps = append(reps, rep)
+	}
+
+	return &reps, nil
 }
 
 // sendTelemetry sends the telemetry result to server, if --share is given

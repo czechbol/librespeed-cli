@@ -17,7 +17,7 @@ type BytesCounter struct {
 	total      int
 	payload    []byte
 	reader     io.ReadSeeker
-	mebi       bool
+	binaryBase bool
 	uploadSize int
 
 	lock *sync.Mutex
@@ -54,8 +54,8 @@ func (c *BytesCounter) Read(p []byte) (int, error) {
 }
 
 // SetBase sets the base for dividing bytes into megabyte or mebibyte
-func (c *BytesCounter) SetMebi(mebi bool) {
-	c.mebi = mebi
+func (c *BytesCounter) SetBinaryBase(binaryBase bool) {
+	c.binaryBase = binaryBase
 }
 
 // SetUploadSize sets the size of payload being uploaded
@@ -71,7 +71,7 @@ func (c *BytesCounter) AvgBytes() float64 {
 // AvgMbps returns the average mbits/second
 func (c *BytesCounter) AvgMbps() float64 {
 	var base float64 = 125000
-	if c.mebi {
+	if c.binaryBase {
 		base = 131072
 	}
 	return c.AvgBytes() / base
@@ -82,7 +82,7 @@ func (c *BytesCounter) AvgHumanize() string {
 	val := c.AvgBytes()
 
 	var base float64 = 1000
-	if c.mebi {
+	if c.binaryBase {
 		base = 1024
 	}
 

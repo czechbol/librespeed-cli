@@ -30,7 +30,7 @@ func main() {
 	app := &cli.App{
 		Name:     "librespeed-cli",
 		Usage:    "Test your Internet speed with LibreSpeed",
-		Action:   speedtest.SpeedTest,
+		Action:   speedtest.RunCli,
 		HideHelp: true,
 		Flags: []cli.Flag{
 			cli.HelpFlag,
@@ -73,7 +73,7 @@ func main() {
 					"\t--json or --csv",
 			},
 			&cli.BoolFlag{
-				Name:  defs.OptionMebiBytes,
+				Name:  defs.OptionBinaryBase,
 				Usage: "Use 1024 bytes as 1 kilobyte instead of 1000",
 			},
 			&cli.StringFlag{
