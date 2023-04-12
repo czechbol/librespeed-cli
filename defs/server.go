@@ -291,11 +291,7 @@ func (s *Server) ManualDownload(
 		pb := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 		pb.Prefix = "Downloading...  "
 		pb.PostUpdate = func(s *spinner.Spinner) {
-			if useBytes {
-				s.Suffix = fmt.Sprintf("  %s", counter.AvgHumanize())
-			} else {
-				s.Suffix = fmt.Sprintf("  %.2f Mbps", counter.AvgMbps())
-			}
+			s.Suffix = fmt.Sprintf("  %s", counter.AvgHumanize(useBytes))
 		}
 
 		pb.Start()
@@ -303,10 +299,10 @@ func (s *Server) ManualDownload(
 			if useBytes {
 				pb.FinalMSG = fmt.Sprintf(
 					"Download rate:\t%s\n",
-					counter.AvgHumanize(),
+					counter.AvgHumanize(useBytes),
 				)
 			} else {
-				pb.FinalMSG = fmt.Sprintf("Download rate:\t%.2f Mbps\n", counter.AvgMbps())
+				pb.FinalMSG = fmt.Sprintf("Download rate:\t%s\n", counter.AvgHumanize(useBytes))
 			}
 			pb.Stop()
 		}()
@@ -402,11 +398,7 @@ func (s *Server) ManualUpload(
 		pb := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 		pb.Prefix = "Uploading...  "
 		pb.PostUpdate = func(s *spinner.Spinner) {
-			if useBytes {
-				s.Suffix = fmt.Sprintf("  %s", counter.AvgHumanize())
-			} else {
-				s.Suffix = fmt.Sprintf("  %.2f Mbps", counter.AvgMbps())
-			}
+			s.Suffix = fmt.Sprintf("  %s", counter.AvgHumanize(useBytes))
 		}
 
 		pb.Start()
@@ -414,10 +406,10 @@ func (s *Server) ManualUpload(
 			if useBytes {
 				pb.FinalMSG = fmt.Sprintf(
 					"Upload rate:\t%s\n",
-					counter.AvgHumanize(),
+					counter.AvgHumanize(useBytes),
 				)
 			} else {
-				pb.FinalMSG = fmt.Sprintf("Upload rate:\t%.2f Mbps\n", counter.AvgMbps())
+				pb.FinalMSG = fmt.Sprintf("Upload rate:\t%s\n", counter.AvgHumanize(useBytes))
 			}
 			pb.Stop()
 		}()

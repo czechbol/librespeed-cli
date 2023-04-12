@@ -68,33 +68,71 @@ func (c *BytesCounter) AvgBytes() float64 {
 	return float64(c.total) / time.Now().Sub(c.start).Seconds()
 }
 
+// AvgBits returns the average bits/second
+func (c *BytesCounter) AvgBits() float64 {
+	return c.AvgBytes() * 8
+}
+
 // AvgMbps returns the average mbits/second
 func (c *BytesCounter) AvgMbps() float64 {
-	var base float64 = 125000
+	var base float64 = 1000 * 1000
 	if c.binaryBase {
-		base = 131072
+		base = 1024 * 1024
 	}
-	return c.AvgBytes() / base
+	return c.AvgBits() / base
 }
 
 // AvgHumanize returns the average bytes/kilobytes/megabytes/gigabytes (or bytes/kibibytes/mebibytes/gibibytes) per second
-func (c *BytesCounter) AvgHumanize() string {
-	val := c.AvgBytes()
+func (c *BytesCounter) AvgHumanize(bytes bool) string {
+	val := c.AvgBits()
+	if bytes {
+		val = c.AvgBytes()
+	}
 
 	var base float64 = 1000
-	if c.binaryBase {
+	if c.binaryBase && bytes {
 		base = 1024
+		if val < base {
+			return fmt.Sprintf("%.2f bytes/s", val)
+		} else if val/base < base {
+			return fmt.Sprintf("%.2f KiB/s", val/base)
+		} else if val/base/base < base {
+			return fmt.Sprintf("%.2f MiB/s", val/base/base)
+		} else {
+			return fmt.Sprintf("%.2f GiB/s", val/base/base/base)
+		}
+	} else if c.binaryBase {
+		base = 1024
+		if val < base {
+			return fmt.Sprintf("%.2f bits/s", val)
+		} else if val/base < base {
+			return fmt.Sprintf("%.2f Kibit/s", val/base)
+		} else if val/base/base < base {
+			return fmt.Sprintf("%.2f Mibit/s", val/base/base)
+		} else {
+			return fmt.Sprintf("%.2f Gibit/s", val/base/base/base)
+		}
+	} else if bytes {
+		if val < base {
+			return fmt.Sprintf("%.2f bytes/s", val)
+		} else if val/base < base {
+			return fmt.Sprintf("%.2f KB/s", val/base)
+		} else if val/base/base < base {
+			return fmt.Sprintf("%.2f MB/s", val/base/base)
+		} else {
+			return fmt.Sprintf("%.2f GB/s", val/base/base/base)
+		}
+	}
+	if val < base {
+		return fmt.Sprintf("%.2f bits/s", val)
+	} else if val/base < base {
+		return fmt.Sprintf("%.2f Kb/s", val/base)
+	} else if val/base/base < base {
+		return fmt.Sprintf("%.2f Mb/s", val/base/base)
+	} else {
+		return fmt.Sprintf("%.2f Gb/s", val/base/base/base)
 	}
 
-	if val < base {
-		return fmt.Sprintf("%.2f bytes/s", val)
-	} else if val/base < base {
-		return fmt.Sprintf("%.2f KB/s", val/base)
-	} else if val/base/base < base {
-		return fmt.Sprintf("%.2f MB/s", val/base/base)
-	} else {
-		return fmt.Sprintf("%.2f GB/s", val/base/base/base)
-	}
 }
 
 // GenerateBlob generates a random byte array of `uploadSize` in the `payload` field, and sets the `reader` field to
