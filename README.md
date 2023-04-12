@@ -30,7 +30,7 @@ This is a command line interface for LibreSpeed speed test backends, written in 
 ## Use prebuilt binaries
 
 If you don't want to build `librespeed-cli` yourself, you can find different binaries compiled for various platforms in
-the [releases page](https://github.com/librespeed/speedtest-cli/releases).
+the [releases page](https://github.com/czechbol/librespeed-cli/releases).
 
 ## Building `librespeed-cli`
 
@@ -46,7 +46,7 @@ For Linux users, you can use either the archive from golang.org, or install from
 2. Then, clone the repository:
 
     ```shell script
-    $ git clone -b v1.0.0 https://github.com/librespeed/speedtest-cli
+    $ git clone -b v1.0.0 https://github.com/czechbol/librespeed-cli
     ```
 
 3. After you have Go installed on your system (and added to your `$PATH` if you're using the archive from golang.org), you
@@ -275,4 +275,4 @@ If you have some good ideas on improving `librespeed-cli`, you can always submit
 
 ## License
 
-`librespeed-cli` is licensed under [GNU Lesser General Public License v3.0](https://github.com/librespeed/speedtest-cli/blob/master/LICENSE)
+`librespeed-cli` is licensed under [GNU Lesser General Public License v3.0](https://github.com/czechbol/librespeed-cli/blob/master/LICENSE)

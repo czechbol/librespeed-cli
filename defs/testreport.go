@@ -1,9 +1,7 @@
-package report
+package defs
 
 import (
 	"time"
-
-	"github.com/librespeed/speedtest-cli/defs"
 )
 
 // Report represents the output data fields in a nestable file data such as JSON.
@@ -17,7 +15,7 @@ type Report struct {
 	Jitter        float64   `json:"jitter"`
 	Upload        float64   `json:"upload"`
 	Download      float64   `json:"download"`
-	Share         string    `json:"share"`
+	ShareLink     string    `json:"share_link"`
 }
 
 // FlatReport represents the output data fields in a flat file data such as CSV.
@@ -33,15 +31,9 @@ type FlatReport struct {
 	IP        string    `csv:"IP"`
 }
 
-// Server represents the speed test server's information
-type Server struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
-
 // Client represents the speed test client's information
 type Client struct {
-	defs.IPInfoResponse
+	IPInfoResponse
 }
 
 func (r Report) GetFlatReport() FlatReport {
@@ -49,12 +41,12 @@ func (r Report) GetFlatReport() FlatReport {
 
 	rep.Timestamp = r.Timestamp
 	rep.Name = r.Server.Name
-	rep.Address = r.Server.URL
+	rep.Address = r.Server.Server
 	rep.Ping = r.Ping
 	rep.Jitter = r.Jitter
 	rep.Download = r.Download
 	rep.Upload = r.Upload
-	rep.Share = r.Share
+	rep.Share = r.ShareLink
 	rep.IP = r.Client.IP
 
 	return rep

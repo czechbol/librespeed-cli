@@ -9,15 +9,18 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/briandowns/spinner"
 	"github.com/go-ping/ping"
 	log "github.com/sirupsen/logrus"
+	"github.com/umahmood/haversine"
 )
 
 // Server represents a speed test server
@@ -36,6 +39,17 @@ type Server struct {
 	TLog   TelemetryLog `json:"-"`
 }
 
+func (s Server) String() string {
+	return fmt.Sprintf(
+		"%d: %s (%s) [Sponsor: %s @ %s]",
+		s.ID,
+		s.Name,
+		s.Server,
+		s.SponsorName,
+		s.SponsorURL,
+	)
+}
+
 // IsUp checks the speed test backend is up by accessing the ping URL
 func (s *Server) IsUp() bool {
 	t := time.Now()
@@ -44,7 +58,7 @@ func (s *Server) IsUp() bool {
 	}()
 
 	u, _ := s.GetURL()
-	u.Path = path.Join(u.Path, s.PingURL)
+	u.Path, _ = url.JoinPath(u.Path, s.PingURL)
 
 	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -68,7 +82,7 @@ func (s *Server) IsUp() bool {
 }
 
 // ICMPPingAndJitter pings the server via ICMP echos and calculate the average ping and jitter
-func (s *Server) ICMPPingAndJitter(count int, srcIp, network string) (float64, float64, error) {
+func (s *Server) ICMPPingAndJitter(count int) (float64, float64, error) {
 	t := time.Now()
 	defer func() {
 		s.TLog.Logf("ICMP ping took %s", time.Now().Sub(t).String())
@@ -86,12 +100,8 @@ func (s *Server) ICMPPingAndJitter(count int, srcIp, network string) (float64, f
 	}
 
 	p := ping.New(u.Hostname())
-	p.SetNetwork(network)
 	p.Count = count
 	p.Timeout = time.Duration(count) * time.Second
-	if srcIp != "" {
-		p.Source = srcIp
-	}
 	if log.GetLevel() == log.DebugLevel {
 		p.Debug = true
 	}
@@ -120,7 +130,11 @@ func (s *Server) ICMPPingAndJitter(count int, srcIp, network string) (float64, f
 
 	if len(stats.Rtts) == 0 {
 		s.NoICMP = true
-		log.Debugf("No ICMP pings returned for server %s (%s), trying TCP ping", s.Name, u.Hostname())
+		log.Debugf(
+			"No ICMP pings returned for server %s (%s), trying TCP ping",
+			s.Name,
+			u.Hostname(),
+		)
 		return s.PingAndJitter(count + 2)
 	}
 
@@ -187,15 +201,50 @@ func (s *Server) PingAndJitter(count int) (float64, float64, error) {
 	return getAvg(pings), jitter, nil
 }
 
-// Download performs the actual download test
-func (s *Server) Download(silent bool, useBytes, useMebi bool, requests int, chunks int, duration time.Duration) (float64, int, error) {
+// Download performs the ManualDownload test, but omits the variables used for direct output
+func (s *Server) Download(
+	requests int,
+	chunks int,
+	duration time.Duration,
+) (float64, int, error) {
+	return s.ManualDownload(false, false, false, requests, chunks, duration)
+}
+
+// Upload performs the ManualUpload test, but omits the variables used for direct output
+func (s *Server) Upload(
+	noPrealloc bool,
+	requests int,
+	uploadSize int,
+	duration time.Duration,
+) (float64, int, error) {
+	return s.ManualUpload(
+		noPrealloc,
+		false,
+		false,
+		false,
+		requests,
+		uploadSize,
+		duration,
+	)
+}
+
+// ManualDownload performs the actual download test with parameters for output which
+// is used with human readable output.
+func (s *Server) ManualDownload(
+	verbose bool,
+	useBytes bool,
+	useBinaryBase bool,
+	requests int,
+	chunks int,
+	duration time.Duration,
+) (float64, int, error) {
 	t := time.Now()
 	defer func() {
 		s.TLog.Logf("Download took %s", time.Now().Sub(t).String())
 	}()
 
 	counter := NewCounter()
-	counter.SetMebi(useMebi)
+	counter.SetBinaryBase(useBinaryBase)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -238,7 +287,7 @@ func (s *Server) Download(silent bool, useBytes, useMebi bool, requests int, chu
 	}
 
 	counter.Start()
-	if !silent {
+	if verbose {
 		pb := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 		pb.Prefix = "Downloading...  "
 		pb.PostUpdate = func(s *spinner.Spinner) {
@@ -252,7 +301,10 @@ func (s *Server) Download(silent bool, useBytes, useMebi bool, requests int, chu
 		pb.Start()
 		defer func() {
 			if useBytes {
-				pb.FinalMSG = fmt.Sprintf("Download rate:\t%s\n", counter.AvgHumanize())
+				pb.FinalMSG = fmt.Sprintf(
+					"Download rate:\t%s\n",
+					counter.AvgHumanize(),
+				)
 			} else {
 				pb.FinalMSG = fmt.Sprintf("Download rate:\t%.2f Mbps\n", counter.AvgMbps())
 			}
@@ -279,15 +331,24 @@ Loop:
 	return counter.AvgMbps(), counter.Total(), nil
 }
 
-// Upload performs the actual upload test
-func (s *Server) Upload(noPrealloc, silent, useBytes, useMebi bool, requests int, uploadSize int, duration time.Duration) (float64, int, error) {
+// ManualUpload performs the actual upload test with parameters for output which
+// is used with human readable output.
+func (s *Server) ManualUpload(
+	noPrealloc bool,
+	verbose bool,
+	useBytes bool,
+	useBinaryBase bool,
+	requests int,
+	uploadSize int,
+	duration time.Duration,
+) (float64, int, error) {
 	t := time.Now()
 	defer func() {
 		s.TLog.Logf("Upload took %s", time.Now().Sub(t).String())
 	}()
 
 	counter := NewCounter()
-	counter.SetMebi(useMebi)
+	counter.SetBinaryBase(useBinaryBase)
 	counter.SetUploadSize(uploadSize)
 
 	if noPrealloc {
@@ -306,7 +367,12 @@ func (s *Server) Upload(noPrealloc, silent, useBytes, useMebi bool, requests int
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	u.Path = path.Join(u.Path, s.UploadURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), counter)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		u.String(),
+		counter,
+	)
 	if err != nil {
 		log.Debugf("Failed when creating HTTP request: %s", err)
 		return 0, 0, err
@@ -318,7 +384,8 @@ func (s *Server) Upload(noPrealloc, silent, useBytes, useMebi bool, requests int
 
 	doUpload := func() {
 		resp, err := http.DefaultClient.Do(req)
-		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		if err != nil && !errors.Is(err, context.Canceled) &&
+			!errors.Is(err, context.DeadlineExceeded) {
 			log.Debugf("Failed when making HTTP request: %s", err)
 		} else if err == nil {
 			defer resp.Body.Close()
@@ -331,7 +398,7 @@ func (s *Server) Upload(noPrealloc, silent, useBytes, useMebi bool, requests int
 	}
 
 	counter.Start()
-	if !silent {
+	if verbose {
 		pb := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
 		pb.Prefix = "Uploading...  "
 		pb.PostUpdate = func(s *spinner.Spinner) {
@@ -345,7 +412,10 @@ func (s *Server) Upload(noPrealloc, silent, useBytes, useMebi bool, requests int
 		pb.Start()
 		defer func() {
 			if useBytes {
-				pb.FinalMSG = fmt.Sprintf("Upload rate:\t%s\n", counter.AvgHumanize())
+				pb.FinalMSG = fmt.Sprintf(
+					"Upload rate:\t%s\n",
+					counter.AvgHumanize(),
+				)
 			} else {
 				pb.FinalMSG = fmt.Sprintf("Upload rate:\t%.2f Mbps\n", counter.AvgMbps())
 			}
@@ -373,53 +443,76 @@ Loop:
 }
 
 // GetIPInfo accesses the backend's getIP.php endpoint and get current client's IP information
-func (s *Server) GetIPInfo(distanceUnit string) (*GetIPResult, error) {
-	t := time.Now()
-	defer func() {
-		s.TLog.Logf("Get IP info took %s", time.Now().Sub(t).String())
-	}()
-
-	var ipInfo GetIPResult
-	u, err := s.GetURL()
+func (s *Server) WorkaroundGetIPInfo(distanceUnit string) (*GetIPResult, error) {
+	resp, err := http.Get("https://ipinfo.io/json")
 	if err != nil {
-		log.Debugf("Failed to get server URL: %s", err)
-		return nil, err
-	}
-	u.Path = path.Join(u.Path, s.GetIPURL)
-	q := u.Query()
-	q.Set("isp", "true")
-	q.Set("distance", distanceUnit)
-	u.RawQuery = q.Encode()
-
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
-	if err != nil {
-		log.Debugf("Failed when creating HTTP request: %s", err)
-		return nil, err
-	}
-	req.Header.Set("User-Agent", UserAgent)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Debugf("Failed when making HTTP request: %s", err)
+		log.Debugf("Failed getting IP Info: %s", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
 
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Debugf("Failed when reading HTTP response: %s", err)
-		return nil, err
-	}
-
-	if len(b) > 0 {
-		if err := json.Unmarshal(b, &ipInfo); err != nil {
+	var clientInfo IPInfoResponse
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &clientInfo); err != nil {
 			log.Debugf("Failed when parsing get IP result: %s", err)
-			log.Debugf("Received payload: %s", b)
-			ipInfo.ProcessedString = string(b[:])
+			log.Debugf("Received payload: %s", body)
 		}
 	}
 
-	return &ipInfo, nil
+	var serverUrl *url.URL
+	if serverUrl, err = s.GetURL(); err != nil {
+		return nil, err
+	}
+
+	ips, err := net.LookupIP(serverUrl.Host)
+	if err != nil {
+		fmt.Printf("Could not get IPs: %v\n", err)
+	}
+	var serverIP string
+	for _, ip := range ips {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			serverIP = ipv4.String()
+		}
+	}
+
+	serverQuery, err := url.JoinPath("https://ipinfo.io/", serverIP, "/json")
+	if err != nil {
+		log.Debugf("Failed getting IP Info: %s", err)
+		return nil, err
+	}
+	resp, err = http.Get(serverQuery)
+	if err != nil {
+		log.Debugf("Failed getting IP Info: %s", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err = io.ReadAll(resp.Body)
+
+	var serverInfo IPInfoResponse
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &serverInfo); err != nil {
+			log.Debugf("Failed when parsing get IP result: %s", err)
+			log.Debugf("Received payload: %s", body)
+		}
+	}
+
+	var processedString string
+	if clientInfo.IP != "" {
+		processedString = clientInfo.IP
+	}
+	if clientInfo.Organization != "" {
+		processedString = processedString + " - " + clientInfo.Organization
+	}
+	if clientInfo.Country != "" {
+		processedString = processedString + ", " + clientInfo.Country
+	}
+	distance := calculateDistance(clientInfo.Location, serverInfo.Location, distanceUnit)
+	if distance != "" {
+		processedString = processedString + " (" + distance + ")"
+	}
+
+	return &GetIPResult{ProcessedString: processedString, RawISPInfo: clientInfo}, nil
 }
 
 // GetURL parses the server's URL into a url.URL
@@ -456,4 +549,59 @@ func (s *Server) Sponsor() string {
 		}
 	}
 	return sponsorMsg
+}
+
+func parseLocationString(location string) (haversine.Coord, error) {
+	var coord haversine.Coord
+
+	parts := strings.Split(location, ",")
+	if len(parts) != 2 {
+		err := fmt.Errorf("unknown location format: %s", location)
+		log.Error(err)
+		return coord, err
+	}
+
+	lat, err := strconv.ParseFloat(parts[0], 64)
+	if err != nil {
+		log.Errorf("Error parsing latitude: %s", parts[0])
+		return coord, err
+	}
+
+	lng, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil {
+		log.Errorf("Error parsing longitude: %s", parts[0])
+		return coord, err
+	}
+
+	coord.Lat = lat
+	coord.Lon = lng
+
+	return coord, nil
+}
+
+func calculateDistance(serverLocation string, clientLocation string, unit string) string {
+	serverCoord, err := parseLocationString(serverLocation)
+	if err != nil {
+		log.Errorf("Error parsing client coordinates: %s", err)
+		return ""
+	}
+	clientCoord, err := parseLocationString(clientLocation)
+	if err != nil {
+		log.Errorf("Error parsing client coordinates: %s", err)
+		return ""
+	}
+
+	dist, km := haversine.Distance(clientCoord, serverCoord)
+	unitString := " mi"
+
+	switch unit {
+	case "km":
+		dist = km
+		unitString = " km"
+	case "NM":
+		dist = km * 0.539957
+		unitString = " NM"
+	}
+
+	return fmt.Sprintf("%.2f%s", dist, unitString)
 }
