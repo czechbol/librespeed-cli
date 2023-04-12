@@ -1,57 +1,24 @@
 package defs
 
-type DistanceUnit string
-
-const (
-	Kilometres    DistanceUnit = "km"
-	Miles         DistanceUnit = "mi"
-	NauticalMiles DistanceUnit = "NM"
-)
-
 type TestOptions struct {
-	Chunks          int
-	Concurrent      int
-	BinaryBase      bool
-	Bytes           bool
-	DistanceUnit    DistanceUnit
-	Duration        int
-	Network         string
-	NoDownload      bool
-	NoICMP          bool
-	NoPreAllocate   bool
-	NoUpload        bool
-	Secure          bool
-	ServerList      []Server
-	Share           bool
-	SkipCertVerify  bool
-	SourceIP        string
-	TelemetryServer TelemetryServer
-	TelemetryExtra  string
-	Timeout         int
-	UploadSize      int
-}
-
-// Returns true if IPType is set to IPv4
-func (testOpts TestOptions) IPv4() bool {
-	return testOpts.Network == "ip4"
-}
-
-// Returns true if IPType is set to IPv6
-func (testOpts TestOptions) IPv6() bool {
-	return testOpts.Network == "ip6"
-}
-
-// Returns true if DistanceUnit is set to km
-func (testOpts TestOptions) Kilometres() bool {
-	return testOpts.DistanceUnit == DistanceUnit("km")
-}
-
-// Returns true if DistanceUnit is set to mi
-func (testOpts TestOptions) Miles() bool {
-	return testOpts.DistanceUnit == DistanceUnit("mi")
-}
-
-// Returns true if DistanceUnit is set to nm
-func (testOpts TestOptions) NauticalMiles() bool {
-	return testOpts.DistanceUnit == DistanceUnit("nm")
+	Chunks          int             `json:"chunks"`
+	Concurrent      int             `json:"concurrent"`
+	BinaryBase      bool            `json:"binary_base,omitempty"`
+	Bytes           bool            `json:"bytes,omitempty"`
+	DistanceUnit    string          `json:"distance_unit"`
+	Duration        int             `json:"duration"`
+	Network         string          `json:"network"`
+	NoDownload      bool            `json:"no_download,omitempty"`
+	NoICMP          bool            `json:"no_icmp,omitempty"`
+	NoPreAllocate   bool            `json:"no_pre_allocate,omitempty"`
+	NoUpload        bool            `json:"no_upload,omitempty"`
+	Secure          bool            `json:"secure,omitempty"`
+	ServerList      []Server        `json:"server_list,omitempty"`
+	Share           bool            `json:"share,omitempty"`
+	SkipCertVerify  bool            `json:"skip_cert_verify,omitempty"`
+	SourceIP        string          `json:"source_ip,omitempty"`
+	TelemetryServer TelemetryServer `json:"telemetry_server"`
+	TelemetryExtra  string          `json:"telemetry_extra,omitempty"`
+	Timeout         int             `json:"timeout"`
+	UploadSize      int             `json:"upload_size"`
 }
