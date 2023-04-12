@@ -13,7 +13,7 @@ import (
 	"github.com/czechbol/librespeedtest/defs"
 	"github.com/czechbol/librespeedtest/speedtest"
 	"github.com/gocarina/gocsv"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -70,14 +70,14 @@ type CLIOptions struct {
 	LogVerbosity    int                  `json:"-"`
 }
 
-func (cliOpts *CLIOptions) Complete(log *logrus.Logger, args []string) error {
+func (cliOpts *CLIOptions) Complete(args []string) error {
 	if !formatCheck[cliOpts.Format] {
 		keys := make([]string, 0, len(formatCheck))
 		for k := range formatCheck {
 			keys = append(keys, k)
 		}
 		printKeys := "['" + strings.Join(keys, `','`) + `']`
-		log.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"got":     cliOpts.Format,
 			"allowed": printKeys,
 		}).Fatal("Invalid Argument")
@@ -88,7 +88,7 @@ func (cliOpts *CLIOptions) Complete(log *logrus.Logger, args []string) error {
 			keys = append(keys, k)
 		}
 		printKeys := "['" + strings.Join(keys, `','`) + `']`
-		log.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"got":     cliOpts.DistanceUnit,
 			"allowed": printKeys,
 		}).Fatal("Invalid Argument")
@@ -98,10 +98,9 @@ func (cliOpts *CLIOptions) Complete(log *logrus.Logger, args []string) error {
 
 func (cliOpts *CLIOptions) Run(
 	cmd *cobra.Command,
-	log *logrus.Logger,
 	out io.Writer,
 ) error {
-	log.SetLevel(logrus.Level(3 + cliOpts.LogVerbosity))
+	log.SetLevel(log.Level(3 + cliOpts.LogVerbosity))
 
 	// Print CSV header and exit
 	header, err := cmd.Flags().GetBool("csv-header")
@@ -131,6 +130,7 @@ func (cliOpts *CLIOptions) Run(
 	}
 
 	// Fetch server list
+	log.Info("Fetching server list")
 	var defaultServerList *[]defs.Server
 	if defaultServerList, err = speedtest.FetchServerList(speedtest.ServerListUrl); err != nil {
 		log.WithField("url", speedtest.ServerListUrl).
@@ -163,19 +163,16 @@ func (cliOpts *CLIOptions) Run(
 		return nil
 	}
 
-	var serverList *[]defs.Server
+	log.Info("Selecting the fastest server based on ping")
 	var testServer defs.Server
-	if serverList, err = speedtest.FetchServerList(speedtest.ServerListUrl); err != nil {
+	if testServer, err = speedtest.RankServers(&cliOpts.ServerList); err != nil {
 		return err
 	}
-	if err = speedtest.PreprocessServers(serverList, cliOpts.ForceHTTPS, cliOpts.NoICMP); err != nil {
-		return err
-	}
-	if testServer, err = speedtest.RankServers(serverList); err != nil {
-		return err
-	}
+	log.Info("Starting the speed test")
 	report, err := speedtest.SingleSpeedTest(
 		&testServer,
+		cliOpts.NoDownload,
+		cliOpts.NoUpload,
 		speedtest.DefaultPingCount,
 		cliOpts.DistanceUnit,
 		cliOpts.Concurrent,
@@ -252,7 +249,7 @@ Upload rate:    %.2f Mbps
 	return nil
 }
 
-func (cliOpts *CLIOptions) CobraCommand(log *logrus.Logger) *cobra.Command {
+func (cliOpts *CLIOptions) CobraCommand() *cobra.Command {
 	version := fmt.Sprintf(`%s %s (built on %s)
 Licensed under GNU Lesser General Public License v3.0
 LibreSpeed	Copyright (C) 2016-2020 Federico Dossena
@@ -379,10 +376,10 @@ image, not displayed with csv and tsv formats.`,
 	)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
-		if err := cliOpts.Complete(log, args); err != nil {
+		if err := cliOpts.Complete(args); err != nil {
 			return err
 		}
-		return cliOpts.Run(cmd, log, cmd.OutOrStderr())
+		return cliOpts.Run(cmd, cmd.OutOrStderr())
 	}
 
 	return cmd

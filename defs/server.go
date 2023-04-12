@@ -202,6 +202,7 @@ func (s *Server) PingAndJitter(count int) (float64, float64, error) {
 }
 
 // Download performs the ManualDownload test, but omits the variables used for direct output
+// Returns speeds in Mbps.
 func (s *Server) Download(
 	requests int,
 	chunks int,
@@ -228,8 +229,8 @@ func (s *Server) Upload(
 	)
 }
 
-// ManualDownload performs the actual download test with parameters for output which
-// is used with human readable output.
+// ManualDownload performs the actual download test with optional real-time output.
+// Returns speeds in Mbps.
 func (s *Server) ManualDownload(
 	verbose bool,
 	useBytes bool,
@@ -327,8 +328,8 @@ Loop:
 	return counter.AvgMbps(), counter.Total(), nil
 }
 
-// ManualUpload performs the actual upload test with parameters for output which
-// is used with human readable output.
+// ManualUpload performs the actual upload test with optional real-time output.
+// Returns speeds in Mbps.
 func (s *Server) ManualUpload(
 	noPrealloc bool,
 	verbose bool,

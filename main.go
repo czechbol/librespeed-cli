@@ -7,16 +7,14 @@ import (
 	"os"
 
 	"github.com/czechbol/librespeedtest/cmd"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
-var log = logrus.New()
-
 func main() {
-	log.Out = os.Stdout
-	log.SetFormatter(&logrus.TextFormatter{FullTimestamp: true})
+	log.SetOutput(os.Stdout)
+	log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
 
-	if err := (&cmd.CLIOptions{}).CobraCommand(log).Execute(); err != nil {
+	if err := (&cmd.CLIOptions{}).CobraCommand().Execute(); err != nil {
 		log.Error(err)
 	}
 }

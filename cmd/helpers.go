@@ -9,7 +9,7 @@ import (
 	"github.com/czechbol/librespeedtest/defs"
 	"github.com/czechbol/librespeedtest/speedtest"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -40,7 +40,7 @@ func verboseSpeedTest(cliOpts *CLIOptions) error {
 
 	ispInfo, err := cliOpts.TestServer.WorkaroundGetIPInfo(cliOpts.DistanceUnit)
 	if err != nil {
-		logrus.Errorf("Failed to get IP info: %s", err)
+		log.Errorf("Failed to get IP info: %s", err)
 		return err
 	}
 
@@ -67,11 +67,11 @@ func verboseSpeedTest(cliOpts *CLIOptions) error {
 	var downloadValue float64
 	var bytesRead int
 	if cliOpts.NoDownload {
-		logrus.Info("Download test is disabled")
+		log.Info("Download test is disabled")
 	} else {
 		downloadValue, bytesRead, err = cliOpts.TestServer.ManualDownload(true, cliOpts.Bytes, cliOpts.BinaryBase, cliOpts.Concurrent, cliOpts.Chunks, time.Duration(cliOpts.Duration)*time.Second)
 		if err != nil {
-			logrus.Errorf("Failed to get download speed: %s", err)
+			log.Errorf("Failed to get download speed: %s", err)
 			return err
 		}
 	}
@@ -80,11 +80,11 @@ func verboseSpeedTest(cliOpts *CLIOptions) error {
 	var uploadValue float64
 	var bytesWritten int
 	if cliOpts.NoUpload {
-		logrus.Info("Upload test is disabled")
+		log.Info("Upload test is disabled")
 	} else {
 		uploadValue, bytesWritten, err = cliOpts.TestServer.ManualUpload(cliOpts.NoPreAllocate, true, cliOpts.Bytes, cliOpts.BinaryBase, cliOpts.Concurrent, cliOpts.Chunks, time.Duration(cliOpts.Duration)*time.Second)
 		if err != nil {
-			logrus.Errorf("Failed to get upload speed: %s", err)
+			log.Errorf("Failed to get upload speed: %s", err)
 			return err
 		}
 	}
@@ -113,10 +113,10 @@ func verboseSpeedTest(cliOpts *CLIOptions) error {
 			Share:  speedtest.DefaultTelemetryShare,
 		}
 		if link, err := speedtest.SendTelemetry(telemetryServer, extra, ispInfo, &report, &cliOpts.TestServer.TLog); err != nil {
-			logrus.Errorf("Error when sending telemetry data: %s", err)
+			log.Errorf("Error when sending telemetry data: %s", err)
 		} else {
 			report.ShareLink = link
-			logrus.Warnf("Share your result: %s", link)
+			log.Warnf("Share your result: %s", link)
 		}
 	}
 	return nil

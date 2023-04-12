@@ -5,9 +5,10 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // BytesCounter implements io.Reader and io.Writer interface, for counting bytes being read/written in HTTP requests
@@ -75,11 +76,8 @@ func (c *BytesCounter) AvgBits() float64 {
 
 // AvgMbps returns the average mbits/second
 func (c *BytesCounter) AvgMbps() float64 {
-	var base float64 = 1000 * 1000
-	if c.binaryBase {
-		base = 1024 * 1024
-	}
-	return c.AvgBits() / base
+	var base float64 = 1000
+	return c.AvgBits() / (base * base)
 }
 
 // AvgHumanize returns the average bytes/kilobytes/megabytes/gigabytes (or bytes/kibibytes/mebibytes/gibibytes) per second
