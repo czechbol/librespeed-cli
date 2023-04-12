@@ -1,4 +1,4 @@
-project_name: "librespeed-cli"
+project_name: "librespeedtest"
 #dist: ./out
 before:
   hooks:
@@ -11,7 +11,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -w -s -X "librespeed-cli/defs.ProgName={{ .ProjectName }}" -X "librespeed-cli/defs.ProgVersion=v{{ .Version }}" -X "librespeed-cli/defs.BuildDate={{ .Date }}"
+      - -w -s -X "librespeedtest/defs.ProgName={{ .ProjectName }}" -X "librespeedtest/defs.ProgVersion=v{{ .Version }}" -X "librespeedtest/defs.BuildDate={{ .Date }}"
     goos:
       - linux
       - darwin
@@ -40,7 +40,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -w -s -X "librespeed-cli/defs.ProgName={{ .ProjectName }}" -X "librespeed-cli/defs.ProgVersion=v{{ .Version }}" -X "librespeed-cli/defs.BuildDate={{ .Date }}"
+      - -w -s -X "librespeedtest/defs.ProgName={{ .ProjectName }}" -X "librespeedtest/defs.ProgVersion=v{{ .Version }}" -X "librespeedtest/defs.BuildDate={{ .Date }}"
     goos:
       - linux
       - windows
@@ -81,6 +81,6 @@ changelog:
   sort: asc
 release:
   github:
-    owner: librespeed
-    name: speedtest-cli
+    owner: czechbol
+    name: librespeedtest
   disable: false
