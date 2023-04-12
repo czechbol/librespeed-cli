@@ -1,6 +1,6 @@
 FROM golang:1.20.3-alpine as builder
 
-RUN apk add --no-cache bash upx
+RUN apk add --no-cache bash upx git
 
 # Set working directory
 WORKDIR /usr/src/librespeedtest
@@ -16,4 +16,4 @@ FROM alpine:3.17
 # Copy librespeedtest binary
 COPY --from=builder /usr/src/librespeedtest/out/librespeedtest* /bin/librespeedtest
 
-CMD ["/bin/librespeedtest"]
+ENTRYPOINT ["/bin/librespeedtest"]
