@@ -207,7 +207,6 @@ func SendTelemetry(
 		log.Debugf("Error when making HTTP request: %s", err)
 		return "", err
 	}
-	fmt.Println(resp)
 	defer resp.Body.Close()
 
 	id, err := ioutil.ReadAll(resp.Body)
@@ -220,7 +219,6 @@ func SendTelemetry(
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(string(id))
 
 	if str := strings.Split(string(id), " "); len(str) != 2 {
 		return "", fmt.Errorf("server returned invalid response: %s", id)

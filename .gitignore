@@ -136,3 +136,4 @@ go.work
 
 dist/
 out/
+.env*

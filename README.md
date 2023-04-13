@@ -45,6 +45,20 @@ If you have Go installed, installing the latest version is as simple as:
   go install github.com/czechbol/librespeedtest@latest
   ```
 
+## Running with Docker
+
+If you have Docker installed, you can use the built images to run `librespeedtest`:
+
+  ```shell script
+  docker run -it --rm czechbol/librespeedtest:latest
+  # JSON output
+  docker run -it --rm czechbol/librespeedtest:latest -f json
+  # Human readable output using binary base and bytes (producing KiBps, MiBps, ...))
+  docker run -it --rm czechbol/librespeedtest:latest -bB
+  ```
+
+The images are pushed to ghcr.io and docker.io
+
 ## Building `librespeedtest`
 
 1. First, you'll have to install Go (at least version 1.20). For Windows users, [you can download an installer from golang.org](https://golang.org/dl/).
